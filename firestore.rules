@@ -1,0 +1,38 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isOwner(uid) {
+      return request.auth != null && request.auth.uid == uid;
+    }
+
+    // Every user can read/write ONLY their own data.
+    match /users/{uid} {
+      allow read, write: if isOwner(uid);
+
+      match /meals/{id} {
+        allow read, write: if isOwner(uid);
+      }
+      match /water/{id} {
+        allow read, write: if isOwner(uid);
+      }
+      match /weights/{id} {
+        allow read, write: if isOwner(uid);
+      }
+      // Daily AI-usage counter, written by the Vercel API using the user's own token.
+      // It may only start at 1 and then go up by exactly 1, so it cannot be reset or skipped.
+      match /usage/{id} {
+        allow read: if isOwner(uid);
+        allow create: if isOwner(uid)
+                      && request.resource.data.keys().hasOnly(['analyses'])
+                      && request.resource.data.analyses == 1;
+        allow update: if isOwner(uid)
+                      && request.resource.data.keys().hasOnly(['analyses'])
+                      && request.resource.data.analyses == resource.data.analyses + 1;
+        allow delete: if false;
+      }
+    }
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
